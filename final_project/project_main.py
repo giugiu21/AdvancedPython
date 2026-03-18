@@ -16,6 +16,8 @@ from fmnist import FMNIST
 from networks import CNN, MLP
 from networks_lightning import MyLightningModule
 
+from pytorch_lightning.loggers import TensorBoardLogger
+
 def get_devices():
     """
     Check available device and return preferred one cuda > mps > cpu.
@@ -60,6 +62,13 @@ if __name__=="__main__":
     #Part 6
     parser.add_argument("--rotate-test", action="store_true", help="Enable random 90-degree rotations for test dataset")
     parser.add_argument("--rotate-train", action="store_true", help="Enable random 90-degree rotations for train and validation datasets")
+
+    #Part 8
+    parser.add_argument("--use-augmentations", action="store_true", help="Enable additional training augmentations (Random Horizontal Flip)")
+
+    #Part 9
+    parser.add_argument("--analyze-error-source", action="store_true", help="Compute balanced accuracy and per-class accuracy")
+
     args = parser.parse_args()
 
     set_seed(args.seed)
@@ -72,7 +81,7 @@ if __name__=="__main__":
         raise ValueError("--checkpoint can only be used with --evaluate and without --train.")
 
     # Dataset preparation
-    dataset = FMNIST(train=True, rotate= args.rotate_train)
+    dataset = FMNIST(train=True, rotate= args.rotate_train, augment= args.use_augmentations)
     test = FMNIST(train=False, rotate=args.rotate_test)
 
     train_size = int(0.8 * len(dataset)) # taking only 80% of the dataset for training
@@ -105,10 +114,20 @@ if __name__=="__main__":
         patience=5
     )
 
-    #This was added so that i could plot the metrics
-    logger = CSVLogger(
+    #Setting up the directories so that they are easier to see for exercise 7
+    if args.rotate_train and args.rotate_test:
+        exp_name = "train_test_aug"
+    elif args.rotate_test:
+        exp_name = "test_aug"
+    elif args.use_augmentations:
+        exp_name = "train_aug_part8"
+    else:
+        exp_name = "no_aug"
+
+    logger = TensorBoardLogger(
         save_dir=args.model_dir,
-        name=f"{args.model}_logs"
+        name=f"{args.model}_logs",
+        version=exp_name
     )
 
     trainer = pl.Trainer(

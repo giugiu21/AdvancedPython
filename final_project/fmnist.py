@@ -7,15 +7,25 @@ import random
 
 
 class FMNIST(Dataset):
-    def __init__(self, train=True, rotate=False):
+    def __init__(self, train=True, rotate=False, augment=False):
         self.__train = train
         
         self.rotate = rotate #added for Part6
 
-        self._transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.5,), (0.5,))
-        ])
+        self.augment = augment #added for part8
+
+        #Added for Part 8
+        if self.augment and self.__train:
+            self._transform = transforms.Compose([
+                transforms.RandomHorizontalFlip(), #adding the augmentation
+                transforms.ToTensor(),
+                transforms.Normalize((0.5,), (0.5,))
+            ])
+        else:
+            self._transform = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize((0.5,), (0.5,))
+            ])
 
         full_dataset = torchvision.datasets.FashionMNIST(
             root="./data",
