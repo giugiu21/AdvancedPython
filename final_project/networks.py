@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
+#Defining the MLP model class
 class MLP(nn.Module):
     def __init__(self, num_classes=6):
         super().__init__()
@@ -14,13 +14,13 @@ class MLP(nn.Module):
         self.output = nn.Linear(64, num_classes)
 
     def forward(self, x):
-        x = self.flatten(x)      #(batch, 1, 28, 28) flattens to (batch, 784)
+        x = self.flatten(x)      #input size: (batch, 1, 28, 28) flattens to (batch, 784)
         x = F.relu(self.layer1(x))
         x = F.relu(self.layer2(x))
         x = self.output(x)
         return x
 
-
+#Defining the CNN model class
 class CNN(nn.Module):
     def __init__(self, num_classes=6):
         super().__init__()
@@ -33,10 +33,10 @@ class CNN(nn.Module):
         self.output = nn.Linear(128, num_classes)
 
     def forward(self, x):
-        x = self.pool(F.relu(self.conv1(x)))   # (batch, 1, 28, 28) after 1st convolution (batch, 16, 14, 14)
-        x = self.pool(F.relu(self.conv2(x)))   # (batch, 16, 14, 14) after 2nd convolution (batch, 32, 7, 7)
+        x = self.pool(F.relu(self.conv1(x)))   # input size: (batch, 1, 28, 28) after 1st convolution output size: (batch, 16, 28, 28) after 1st pooling output size: (batch, 16, 14, 14)
+        x = self.pool(F.relu(self.conv2(x)))   # input size: (batch, 16, 14, 14) after 2nd convolution output: (batch, 32, 7, 7) after 2nd pooling output size: (batch, 32, 7, 7)
 
-        x = torch.flatten(x, start_dim=1)      # (batch, 32, 7, 7) after flattening layer (batch, 1568)
+        x = torch.flatten(x, start_dim=1)      # input size: (batch, 32, 7, 7) after flattening layer output size: (batch, 1568)
 
         x = F.relu(self.layer1(x))
         x = self.output(x)

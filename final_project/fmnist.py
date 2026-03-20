@@ -15,18 +15,21 @@ class FMNIST(Dataset):
         self.augment = augment #added for part8
 
         #Added for Part 8
+        #Defining the transform for the Dataset: if the augmentations are required we add thr RandomHorizontalFlip
         if self.augment and self.__train:
             self._transform = transforms.Compose([
                 transforms.RandomHorizontalFlip(), #adding the augmentation
                 transforms.ToTensor(),
                 transforms.Normalize((0.5,), (0.5,))
             ])
+        #If augmentations are not required we only use the normalization of the data
         else:
             self._transform = transforms.Compose([
                 transforms.ToTensor(),
                 transforms.Normalize((0.5,), (0.5,))
             ])
 
+        #Loading the full dataset
         full_dataset = torchvision.datasets.FashionMNIST(
             root="./data",
             train=self.__train,
@@ -43,7 +46,8 @@ class FMNIST(Dataset):
             8: 4,  
             9: 5   
         }
-
+        
+        #Creating the subset of data (input-output pairs) from the selected classes in the full dataset
         self._images = []
         self._labels = []
 
@@ -52,7 +56,7 @@ class FMNIST(Dataset):
                 self._images.append(image)
                 self._labels.append(selected_classes[label])
 
-        #Defining a dictionary
+        #Defining a dictionary mapping the name of the classes with their respective id
         self._label_dict = {
             0: "T-shirt/top",
             1: "Trouser",
@@ -78,6 +82,7 @@ class FMNIST(Dataset):
         label = self._labels[idx]
 
         #Added for Part 6
+        #If rotations are required we rotate the images when we return the data
         if self.rotate:
             angle = random.choice([0, 90, 180, 270])
             image = TF.rotate(image, angle)

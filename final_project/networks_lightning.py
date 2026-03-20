@@ -9,7 +9,7 @@ class MyLightningModule(pl.LightningModule):
 
         self.model = model
         self.lr = lr
-        self.loss_fn = nn.CrossEntropyLoss()
+        self.loss_fn = nn.CrossEntropyLoss() #Like defined by the task
 
         #log the hyperparameters including the model type
         self.save_hyperparameters({"model_type": type(model).__name__, "lr": lr})
@@ -28,6 +28,7 @@ class MyLightningModule(pl.LightningModule):
         raw_output = self(x)
         loss = self.loss_fn(raw_output, y)
 
+        #Logging the metrics
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=True)
 
         return loss
@@ -40,6 +41,7 @@ class MyLightningModule(pl.LightningModule):
         predictions = torch.argmax(raw_output, dim=1) #argmax picks the predicted class -> class with higher probability
         accuracy = (predictions == y).float().mean()
 
+        #Logging the metrics
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val_acc", accuracy, on_step=False, on_epoch=True, prog_bar=True)
 
@@ -53,6 +55,7 @@ class MyLightningModule(pl.LightningModule):
         predictions = torch.argmax(raw_output, dim=1) #argmax picks the predicted class -> class with higher probability
         accuracy = (predictions == y).float().mean()
 
+        #Logging the metrics
         self.log("test_loss", loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test_acc", accuracy, on_step=False, on_epoch=True, prog_bar=True)
 

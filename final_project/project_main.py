@@ -15,8 +15,13 @@ from pytorch_lightning.loggers import CSVLogger
 from fmnist import FMNIST
 from networks import CNN, MLP
 from networks_lightning import MyLightningModule
-
 from pytorch_lightning.loggers import TensorBoardLogger
+
+#Part 9 imports
+from sklearn.metrics import balanced_accuracy_score
+from sklearn.metrics import recall_score
+import matplotlib.pyplot as plt
+import numpy as np
 
 def get_devices():
     """
@@ -80,10 +85,12 @@ if __name__=="__main__":
     if args.checkpoint is not None and args.train:
         raise ValueError("--checkpoint can only be used with --evaluate and without --train.")
 
-    # Dataset preparation
+    # --------------------------Dataset preparation---------------
+    #Loading the dataset and test set throught the dataset class
     dataset = FMNIST(train=True, rotate= args.rotate_train, augment= args.use_augmentations)
     test = FMNIST(train=False, rotate=args.rotate_test)
 
+    #Test-Train split 
     train_size = int(0.8 * len(dataset)) # taking only 80% of the dataset for training
     val_size = len(dataset) - train_size #the 20% remaining is for validation
 
@@ -93,12 +100,14 @@ if __name__=="__main__":
         generator=torch.Generator().manual_seed(args.seed) #using the predefined seed so that the split is not random everytime we run the code
     )
 
+    #Loading the training set the validation set and the test set
     train_loader = DataLoader(train, batch_size=args.batch_size, shuffle=True)
     val_loader = DataLoader(val, batch_size=args.batch_size, shuffle=False)
     test_loader = DataLoader(test, batch_size=args.batch_size, shuffle=False)
 
-    # Training settings
+    # ----------------------------Training settings------------------
     #Checkpoint stores the model's weights, epochs and optimizer state during training in case it is needed to restore the training up to that point 
+    #it is based on validation accuracy
     checkpoint_callback = ModelCheckpoint(
         dirpath=args.model_dir,
         filename=f"{args.model}" + "-{epoch:02d}-{val_acc:.4f}",
@@ -107,7 +116,7 @@ if __name__=="__main__":
         save_top_k=1
     )
 
-    #Early stopping allows to stop the training automatically if there is no significant changes after 5 consecutive epochs
+    #Early stopping allows to stop the training automatically if there is no significant changes in validation accuracy after 5 consecutive epochs
     early_stopping_callback = EarlyStopping(
         monitor="val_acc",
         mode="max",
@@ -116,20 +125,22 @@ if __name__=="__main__":
 
     #Setting up the directories so that they are easier to see for exercise 7
     if args.rotate_train and args.rotate_test:
-        exp_name = "train_test_aug"
+        directory = "train_test_aug"
     elif args.rotate_test:
-        exp_name = "test_aug"
+        directory = "test_aug"
     elif args.use_augmentations:
-        exp_name = "train_aug_part8"
+        directory = "train_aug_part8"
     else:
-        exp_name = "no_aug"
+        directory = "no_aug"
 
+    #TensorFlow logger definition using the predefined directories
     logger = TensorBoardLogger(
         save_dir=args.model_dir,
         name=f"{args.model}_logs",
-        version=exp_name
+        version=directory
     )
 
+    #Defining the trainer for the model
     trainer = pl.Trainer(
         max_epochs=args.epochs,
         callbacks=[checkpoint_callback, early_stopping_callback],
@@ -137,14 +148,16 @@ if __name__=="__main__":
         deterministic=True
     )
 
+    #Initializing the best checkpoint path
     best_checkpoint_path = None
 
-    # Training
+    # -----------------Training-------------------
     if args.train:
+        #Building the model and the lightning module
         model = build_model(args.model)
         lm = MyLightningModule(model=model, lr=args.lr)
 
-        # log hyperparameters
+        #logging the hyperparameters given by user input
         logger.log_hyperparams({
             "model_type": args.model,
             "lr": args.lr,
@@ -153,31 +166,87 @@ if __name__=="__main__":
             "seed": args.seed
         })
 
+        #Training the model on the preferences defined
         trainer.fit(lm, train_loader, val_loader)
 
+        #Updating the best checkpoint path
         best_checkpoint_path = checkpoint_callback.best_model_path
-        print(f"Best checkpoint: {best_checkpoint_path}")
+        print(f"Best checkpoint: {best_checkpoint_path}") #Printing it on screen when training is over
 
     
-    # Evaluation
+    # --------------------------Evaluation--------------------
     if args.evaluate:
+        #Loading the best checkpoint path for the model when using the --evaluate flag combined with the --train flag
         if args.train:
             checkpoint_path = best_checkpoint_path
         else:
+             #Control loop to ensure the checkpoint is given by the user in case we use the flag --evaluate i a different command line than --train flag
             if args.checkpoint is None:
                 raise ValueError("For evaluation without training, please provide --checkpoint.")
             checkpoint_path = args.checkpoint
-
+        #Control loop to ensure the checkpoint path exist
         if checkpoint_path is None or not os.path.exists(checkpoint_path):
-            raise ValueError(f"Checkpoint not found: {checkpoint_path}")
+            raise ValueError(f"Checkpoint not found: {checkpoint_path}") 
 
         #build the same model type
         model = build_model(args.model)
 
+        #Load the lighting module for the model
         lm = MyLightningModule.load_from_checkpoint(
             checkpoint_path,
             model=model,
             lr=args.lr
         )
-
+        #Test the model
         trainer.test(lm, dataloaders=test_loader)
+
+    #--------------------------- Error Analysis-----------------
+    #Part 9 
+    if args.analyze_error_source:
+        #Initializing the predictions and labels
+        all_preds = []
+        all_labels = []
+
+        #Evaluating the lighting module
+        lm.eval()
+        #Putting the lighting module to device (gpu is preferred if found)
+        device = get_devices()
+        lm.to(device)
+
+        with torch.no_grad():
+            #Loop over the test data (input-output pairs)
+            for x, y in test_loader:
+                x = x.to(device) 
+                y = y.to(device) 
+
+                #Passing the input to the model
+                logits = lm(x)
+                #Getting the predictions
+                preds = torch.argmax(logits, dim=1)
+
+                #Storing the predictions and all the labels
+                all_preds.extend(preds.cpu().numpy())
+                all_labels.extend(y.cpu().numpy())
+
+        #Computing the balanced accuracy -- average of recall obtained on each class
+        balanced_accuracy = balanced_accuracy_score(all_labels, all_preds)
+        print(f"Balanced Accuracy: {balanced_accuracy}")
+
+        #Computing the per-class accuracy
+        class_accuracy = recall_score(all_labels, all_preds, average=None)
+
+        #For each class print the accuracy score
+        for i, accuracy in enumerate(class_accuracy):
+            print(f"Class {i} Accuracy: {accuracy:.4f}")
+
+        num_classes = len(np.unique(all_labels)) #total number of classes
+
+        #Bar Plot for per class accuracy
+        plt.figure()
+        plt.bar(range(num_classes), class_accuracy)
+        plt.xlabel("Class")
+        plt.ylabel("Accuracy")
+        plt.title("Accuracy per Class")
+
+        plt.tight_layout()
+        plt.show()
